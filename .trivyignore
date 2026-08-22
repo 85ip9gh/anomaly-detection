@@ -1,0 +1,65 @@
+# Allowlisted CVEs. Every entry is dated and carries a reason, because the
+# allowlist is the evidence of judgement: a gate with no allowlist either never
+# fired or was quietly lowered, and neither is a defensible answer.
+#
+# The rule applied here: an entry is allowed only when Debian 13 has no fixed
+# version AND the vulnerable code has no reachable caller in this image. Where a
+# fix existed it was taken instead. `apt-get upgrade` in the Dockerfile cleared
+# 20 HIGH findings in the util-linux family (CVE-2026-53612 through 53615) that
+# would otherwise be sitting in this file, and taking a fix is always preferred
+# to recording a reason not to.
+#
+# `ignore-unfixed` is deliberately NOT set on the scanner. Hiding every unfixed
+# finding would erase exactly the judgement this file records.
+#
+# Reviewed 2026-08-22 against python:3.12-slim (Debian 13, trixie).
+# Re-check when the base image is next bumped: an entry that outlives its
+# reason is worse than no entry, because it reads as a decision somebody made.
+
+# ---------------------------------------------------------------------------
+# perl-base, 8 findings including 4 CRITICAL. 2026-08-22.
+#
+# perl arrives with the Debian base and this service never executes it. Nothing
+# in the image shells out: the entry point is uvicorn, the request path is
+# FastAPI into scikit-learn, and the health check is a python one-liner. It
+# cannot be purged either, because dpkg depends on it.
+#
+# The real fix is a base without perl, which means distroless or a
+# from-scratch image, and that is the open item recorded in the README rather
+# than something to pretend away here.
+CVE-2026-13221
+CVE-2026-42496
+CVE-2026-57433
+CVE-2026-8376
+CVE-2026-42497
+CVE-2026-48962
+CVE-2026-57432
+CVE-2026-9538
+
+# ---------------------------------------------------------------------------
+# openssl, libssl3t64, openssl-provider-legacy. 2026-08-22.
+# Debian marks this fix_deferred, so there is nothing to upgrade to.
+# This container does not terminate TLS and makes no outbound TLS connection.
+# It speaks plain HTTP on the container network; the Cloudflare Tunnel and the
+# reverse proxy in front of it are what hold certificates. Revisit the moment
+# this service is given a certificate or an outbound client.
+CVE-2026-14456
+
+# ---------------------------------------------------------------------------
+# ncurses: libncursesw6, libtinfo6, ncurses-base, ncurses-bin. 2026-08-22.
+# A terminal library in a container that is never given a TTY and runs no
+# terminal program. No fixed version in Debian 13.
+CVE-2025-69720
+
+# ---------------------------------------------------------------------------
+# gzip. 2026-08-22.
+# The gzip *binary* is never invoked. The dataset is gzipped and is read by
+# Python's gzip module through zlib, at build time, from a file pinned by
+# sha256 in this repository. There is no path from a request to this package.
+CVE-2026-41992
+
+# ---------------------------------------------------------------------------
+# libacl1. 2026-08-22.
+# POSIX ACL library. The service sets no ACLs and writes nothing outside the
+# container's own layer. No fixed version in Debian 13.
+CVE-2026-54369

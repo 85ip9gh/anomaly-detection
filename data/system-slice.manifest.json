@@ -1,12 +1,23 @@
 {
   "kind": "system",
-  "source": "spool",
-  "rows": 6798,
+  "source": "hdfs",
+  "via": "docker",
+  "file": "system-slice.ndjson.gz",
+  "rows": 17813,
+  "duplicates_dropped": 0,
   "hosts": [
     "cubebox"
   ],
-  "first_ts": "2026-08-19T07:44:09.115755Z",
-  "last_ts": "2026-08-21T20:33:53.356069Z",
-  "sha256": "69731ace08d9f3f6b5a2dc1f68811aade741afaa2fc0345d920daa8d14fa4dc5",
-  "exported_at": "2026-08-22T04:53:02+00:00"
+  "hosts_available": [
+    "cubebox",
+    "g7-server"
+  ],
+  "host_filter": "cubebox",
+  "first_ts": "2026-08-15T16:46:04.115484Z",
+  "last_ts": "2026-08-22T05:21:38.561040Z",
+  "bytes_uncompressed": 5371587,
+  "bytes_on_disk": 585264,
+  "sha256": "ed2b3d531f376d3ce8d21da68d6b2b6397b6e85b9bb14806c7b357f47f3dd993",
+  "sha256_covers": "uncompressed NDJSON body",
+  "exported_at": "2026-08-22T05:22:33+00:00"
 }
