@@ -52,18 +52,29 @@ def score(truth: list[int], predicted: list[int]) -> Scores:
     )
 
 
-def usable(pairs: list[tuple[Window, int]], minimum_positives: int = 5) -> tuple[bool, str]:
+def usable(pairs: list[tuple[Window, int]], minimum_positives: int = 5,
+           minimum_negatives: int = 5) -> tuple[bool, str]:
     """Whether a labelled set can support a metric anybody should quote.
 
     Exists because the failure this project is most likely to have is not a bad
     model, it is a good-looking number computed over four labelled windows. The
     check is deliberately part of the library rather than a note in the README,
     so a run that cannot be evaluated says so itself.
+
+    Both classes are required, not just positives. An all-positive set makes
+    precision trivially 1.0 for anything that fires and makes ROC AUC undefined,
+    so `roc_auc_score` raises and the ranking quietly disappears from the report
+    while precision and recall stay on the page looking like results.
     """
     positives = sum(1 for _, y in pairs if y == 1)
+    negatives = len(pairs) - positives
     if not pairs:
         return False, "no labelled windows"
     if positives < minimum_positives:
         return False, (f"{positives} positive windows, fewer than the {minimum_positives} "
                        "needed before precision and recall mean anything")
-    return True, f"{len(pairs)} labelled windows, {positives} positive"
+    if negatives < minimum_negatives:
+        return False, (f"{negatives} negative windows, fewer than the {minimum_negatives} "
+                       "needed. With no negatives precision cannot be wrong and "
+                       "ROC AUC is undefined")
+    return True, f"{len(pairs)} labelled windows, {positives} positive, {negatives} negative"

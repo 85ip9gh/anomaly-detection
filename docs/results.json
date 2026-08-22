@@ -1,63 +1,130 @@
 {
-  "mode": "diagnostic-in-sample",
-  "windows": 225,
-  "train": 157,
-  "test": 68,
-  "labelled_test": 218,
-  "positive_test": 129,
-  "positive_rate_test": 0.591743119266055,
+  "mode": "held-out",
+  "windows": 591,
+  "train": 366,
+  "test": 225,
+  "labelled_test": 211,
+  "positive_test": 130,
+  "positive_rate_test": 0.6161137440758294,
+  "split": "snapped to a gap in the archive, so train and test hold different stretches of machine time",
   "baseline": {
-    "support": 218,
-    "positives": 129,
-    "flagged": 43,
-    "true_positive": 29,
-    "false_positive": 14,
-    "false_negative": 100,
-    "true_negative": 75,
-    "precision": 0.6744186046511628,
-    "recall": 0.2248062015503876,
-    "f1": 0.3372093023255814,
-    "roc_auc": 0.5899311906628343,
-    "average_precision": 0.6542657193971233
+    "support": 211,
+    "positives": 130,
+    "flagged": 39,
+    "true_positive": 27,
+    "false_positive": 12,
+    "false_negative": 103,
+    "true_negative": 69,
+    "precision": 0.6923076923076923,
+    "recall": 0.2076923076923077,
+    "f1": 0.31952662721893493,
+    "roc_auc": 0.5860873694207027,
+    "average_precision": 0.6661108415372855
   },
   "model": {
-    "support": 218,
-    "positives": 129,
-    "flagged": 12,
-    "true_positive": 8,
-    "false_positive": 4,
-    "false_negative": 121,
-    "true_negative": 85,
-    "precision": 0.6666666666666666,
-    "recall": 0.06201550387596899,
-    "f1": 0.11347517730496454,
-    "roc_auc": 0.24649420782161832,
-    "average_precision": 0.5157502241210924
+    "support": 211,
+    "positives": 130,
+    "flagged": 96,
+    "true_positive": 69,
+    "false_positive": 27,
+    "false_negative": 61,
+    "true_negative": 54,
+    "precision": 0.71875,
+    "recall": 0.5307692307692308,
+    "f1": 0.6106194690265487,
+    "roc_auc": 0.6216524216524216,
+    "average_precision": 0.7252730380848273
+  },
+  "trivial_always_flag": {
+    "support": 211,
+    "positives": 130,
+    "flagged": 211,
+    "true_positive": 130,
+    "false_positive": 81,
+    "false_negative": 0,
+    "true_negative": 0,
+    "precision": 0.6161137440758294,
+    "recall": 1.0,
+    "f1": 0.7624633431085045
+  },
+  "trivial_never_flag": {
+    "support": 211,
+    "positives": 130,
+    "flagged": 0,
+    "true_positive": 0,
+    "false_positive": 0,
+    "false_negative": 130,
+    "true_negative": 81,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0
   },
   "top_features": [
     [
-      "cpu_percent_mean",
-      2.763
+      "coverage",
+      37.752
     ],
     [
-      "cpu_percent_std",
-      2.412
+      "net_dropin_rate_mean",
+      8.7
     ],
     [
-      "cpu_percent_max",
-      2.295
+      "net_dropin_rate_max",
+      6.079
     ],
     [
-      "disk_percent_std",
-      2.081
+      "process_count_mean",
+      3.365
     ],
     [
-      "disk_percent_mean",
-      2.063
+      "process_count_max",
+      3.003
     ],
     [
-      "swap_percent_std",
-      1.94
+      "net_bytes_recv_rate_mean",
+      2.623
     ]
+  ],
+  "covariate_shift_train_sigmas": [
+    [
+      "coverage",
+      -40.14
+    ],
+    [
+      "process_count_mean",
+      -4.33
+    ],
+    [
+      "process_count_max",
+      -4.06
+    ],
+    [
+      "net_dropin_rate_mean",
+      3.86
+    ],
+    [
+      "swap_percent_mean",
+      -2.77
+    ],
+    [
+      "net_dropin_rate_max",
+      2.67
+    ],
+    [
+      "swap_percent_max",
+      -2.62
+    ],
+    [
+      "net_bytes_recv_rate_mean",
+      1.18
+    ]
+  ],
+  "dropped_features": [
+    "disk_percent_mean",
+    "disk_percent_max",
+    "disk_percent_std",
+    "net_errin_rate_mean",
+    "net_errin_rate_max",
+    "reboot"
   ]
 }

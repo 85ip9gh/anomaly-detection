@@ -1,0 +1,8 @@
+# The human-readable spec. requirements.txt is the compiled, pinned form of this
+# and is what both the image and the scanners read.
+numpy>=2,<3
+scikit-learn>=1.6,<2
+joblib>=1.4,<2
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+pydantic>=2.8,<3

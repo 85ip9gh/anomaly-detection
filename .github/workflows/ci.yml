@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Tests
+        run: pytest -q
+
+      # The suite deliberately never touches HDFS, Kafka, the network or a
+      # Docker daemon, so it runs the same here as on the workstation. This step
+      # is what keeps that true: an accidental dependency on a live service
+      # would pass locally, where the stack is up, and only fail here.
+      - name: Prove the suite needs no services
+        run: |
+          set -euo pipefail
+          if grep -rnE "InsecureClient|confluent_kafka|localhost:9870|localhost:9092" \
+               tests/ anomaly/ --include="*.py" | grep -v "export_slice"; then
+            echo "a live service crept into the library or the suite"
+            exit 1
+          fi
+          echo "no live-service dependency found"
+
+  reproduce:
+    name: Reproduce the published result
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install --disable-pip-version-check -r requirements.txt
+
+      # docs/results.json is the number the README quotes. Regenerating it here
+      # and failing on any difference is what stops the table from drifting away
+      # from the code that produced it, which is the ordinary way a README ends
+      # up describing a model that no longer exists. The dataset is pinned by
+      # sha256 and the estimator is seeded, so a real difference means a real
+      # change.
+      - name: Rerun the report and diff it
+        run: |
+          set -euo pipefail
+          cp docs/results.json /tmp/published.json
+          python tools/report.py
+          if ! diff -u /tmp/published.json docs/results.json; then
+            echo
+            echo "docs/results.json is out of date. Rerun tools/report.py and commit it."
+            exit 1
+          fi
+          echo "the published result reproduces exactly"
