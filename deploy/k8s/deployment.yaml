@@ -1,0 +1,106 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anomaly-detection
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: anomaly-detection
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anomaly-detection
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anomaly-detection
+    spec:
+      # Nothing here talks to the API server, so the token is a credential the
+      # pod carries for no reason.
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        # The image creates its own system user, but a system uid can collide
+        # with a real account on the node if the container ever escapes its user
+        # namespace. A uid above 10000 cannot. Everything the process reads is
+        # root-owned and world-readable, so the uid here does not have to match
+        # the one the image built.
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: anomaly-detection
+          # Built on the node and imported straight into containerd. There is no
+          # registry, so `Always` would make this unschedulable rather than more
+          # current: see deploy/README.md.
+          image: anomaly-detection:g7
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8090
+              protocol: TCP
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            privileged: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          resources:
+            requests:
+              cpu: 50m
+              memory: 192Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+
+          # Liveness asks whether the process is answering. Readiness asks
+          # whether it can actually score, which is a different question here
+          # and the reason this is an exec probe rather than another GET.
+          #
+          # The service answers /healthz with 200 and `model_loaded: false` when
+          # no artifact is present, deliberately, so an httpGet readiness probe
+          # would mark a container Ready that returns 503 on every /score. That
+          # is precisely the failure this project keeps writing down: a check
+          # that passes because it never looked at the thing that matters.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - |
+                  import json, sys, urllib.request
+                  r = json.load(urllib.request.urlopen("http://127.0.0.1:8090/healthz", timeout=4))
+                  sys.exit(0 if r.get("model_loaded") else 1)
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 8
+            failureThreshold: 3
+
+          volumeMounts:
+            # The root filesystem is read-only, so anything that wants a scratch
+            # path needs one handed to it explicitly.
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
