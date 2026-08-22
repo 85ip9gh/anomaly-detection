@@ -1,2 +1,7 @@
 -r requirements.txt
 pytest>=8,<10
+httpx>=0.27,<1
+# Only tools/export_slice.py --via webhdfs needs this, and that path only works
+# from inside the compose network. It is a dev dependency so it never reaches
+# the image.
+hdfs>=2.7,<3

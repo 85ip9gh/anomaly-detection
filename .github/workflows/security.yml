@@ -1,0 +1,215 @@
+name: Security Gates
+
+# The same three gates as cube-store and car-sale, on a third repository. No
+# path filters, deliberately: a supply-chain gate that skips depending on which
+# files a change touched is not a gate.
+#
+# One difference worth naming. This repository ships a pickle. `artifacts/` is
+# gitignored and the image builds its own model from the pinned slice, so no
+# fitted estimator is ever committed, which is the control that matters: a
+# pickle in Git is arbitrary code that gets loaded without anyone reading the
+# diff. The `no-pickles-tracked` step below is what keeps that true.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: "8.30.1"
+  CHECKOV_IMAGE: "ghcr.io/bridgecrewio/checkov:3.3.13"
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --silent --show-error --fail --location --output gitleaks.tar.gz "$url"
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks gitleaks.tar.gz
+          gitleaks version
+
+      # Full history, not only the diff. A diff-only scan passes while the
+      # secret is still one `git log -p` away, which is the state cube-store was
+      # in for three days.
+      - name: Scan git history for secrets
+        run: |
+          set -euo pipefail
+          gitleaks git . --no-banner --redact --verbose --exit-code 1 \
+            --report-format json --report-path gitleaks-report.json
+
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  no-pickles-tracked:
+    name: No fitted model in Git
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # joblib and pickle both execute whatever the file tells them to on load.
+      # A model file is a build output, and committing one turns `git pull` into
+      # code execution the reviewer never saw. .gitignore says so; this proves
+      # it, because .gitignore does not apply to a file already tracked.
+      - name: Refuse tracked pickles
+        run: |
+          set -euo pipefail
+          found="$(git ls-files | grep -E '\.(joblib|pkl|pickle)$' || true)"
+          if [ -n "$found" ]; then
+            echo "these are tracked and must not be:"
+            echo "$found"
+            exit 1
+          fi
+          echo "no tracked pickle or joblib files"
+
+  deps:
+    name: Dependency and container scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ignore-unfixed is deliberately not set. A CVE with no upstream fix is
+      # allowlisted by hand in .trivyignore with a dated reason, so the judgement
+      # is recorded rather than erased.
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: table
+          output: trivy-fs.txt
+          trivyignores: .trivyignore
+          hide-progress: "true"
+
+      - name: Build the image
+        if: always()
+        run: docker build --tag anomaly-detection:scan .
+
+      # A green scan says the image contains no known-vulnerable package. It
+      # says nothing about whether the service starts, and this image's whole
+      # runtime posture (non-root, a model built in the builder stage, an
+      # artifact path set by environment) fails at START rather than at build.
+      # Hardening nobody has watched run is a guess.
+      - name: Smoke test the image
+        if: always()
+        run: |
+          set -euo pipefail
+          cleanup() { docker rm --force anomaly-smoke > /dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          docker run --detach --name anomaly-smoke \
+            --publish 18090:8090 anomaly-detection:scan > /dev/null
+          for attempt in $(seq 1 40); do
+            body="$(curl --silent --max-time 5 http://127.0.0.1:18090/healthz || true)"
+            case "$body" in
+              *'"model_loaded":true'*)
+                echo "service reports a loaded model, running as $(docker exec anomaly-smoke id -un)"
+                exit 0
+                ;;
+            esac
+            sleep 3
+          done
+          echo "service never reported a loaded model. Container logs:"
+          docker logs anomaly-smoke 2>&1 | tail -60
+          exit 1
+
+      - name: Trivy image scan
+        if: always()
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: image
+          image-ref: anomaly-detection:scan
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: table
+          output: trivy-image.txt
+          trivyignores: .trivyignore
+          hide-progress: "true"
+
+      # Every scan writes to a file so the reports survive as artifacts. Print
+      # them too, otherwise a failing gate says nothing in the run log.
+      - name: Print scan reports
+        if: always()
+        run: |
+          for report in trivy-fs.txt trivy-image.txt; do
+            echo "===== $report ====="
+            if [ -s "$report" ]; then cat "$report"; else echo "no findings at HIGH or CRITICAL"; fi
+          done
+
+      - name: Upload trivy reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-reports
+          path: |
+            trivy-fs.txt
+            trivy-image.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+  iac:
+    name: IaC misconfiguration scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # The pinned checkov image directly rather than the action, so the exact
+      # flags are visible here. Checkov has no docker_compose framework in
+      # 3.3.13, verified against its own valid-framework list, so github_actions
+      # takes the third slot: an unpinned action or an injectable workflow
+      # expression is a supply-chain risk in the same family.
+      #
+      # CKV_IGNORE_HIDDEN_DIRECTORIES=false is not cosmetic. Checkov skips
+      # dot-directories by default, which was proved on cube-store: a Dockerfile
+      # with no USER and no HEALTHCHECK passed cleanly inside a dot-directory and
+      # failed immediately once moved to a visible path.
+      - name: Checkov
+        run: |
+          set -euo pipefail
+          docker run --rm --volume "$PWD:/repo" --workdir /repo \
+            --env CKV_IGNORE_HIDDEN_DIRECTORIES=false "$CHECKOV_IMAGE" \
+            --directory . \
+            --framework dockerfile kubernetes github_actions \
+            --skip-path '^\.git/' \
+            --skip-path '^\.venv/' \
+            --skip-download \
+            --compact \
+            --quiet \
+            --output cli | tee checkov-report.txt
+
+      - name: Upload checkov report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: checkov-report
+          path: checkov-report.txt
+          if-no-files-found: warn
+          retention-days: 30
