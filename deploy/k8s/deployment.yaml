@@ -5,6 +5,15 @@ metadata:
   namespace: apps
   labels:
     app.kubernetes.io/name: anomaly-detection
+  annotations:
+    # Two checkov findings are suppressed here rather than fixed, and both are
+    # consequences of the same deliberate choice: there is no registry. The
+    # image is built on the node and imported straight into containerd.
+    #
+    # An entry that outlives its reason is worse than no entry, so both name the
+    # condition that retires them. Re-check when a registry exists.
+    checkov.io/skip1: CKV_K8S_15=2026-08-22 imagePullPolicy Always makes this pod unschedulable, not more current. With no registry there is nothing to pull from, so the kubelet would fail with ErrImagePull on every start. Revisit if these images are ever pushed to a registry.
+    checkov.io/skip2: CKV_K8S_43=2026-08-22 A digest pin defends against a mutable tag in a registry someone else can write to. This tag is produced by docker build on the node and imported locally, so there is no publication step for anyone to race, and pinning would mean editing this file on every rebuild. Revisit alongside CKV_K8S_15.
 spec:
   replicas: 1
   strategy:

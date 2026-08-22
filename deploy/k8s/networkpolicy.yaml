@@ -1,0 +1,67 @@
+# Checkov's CKV2_K8S_6 flagged this pod for having no NetworkPolicy, and the
+# rule this project already follows is that a fix beats a reason not to fix.
+# k3s runs the kube-router policy controller unless `--disable-network-policy`
+# is passed, and it is not passed here, so this is enforced rather than
+# decorative. That was checked on the node, not assumed from the distribution.
+#
+# Without it, every pod on the cluster can reach this one on any port, which on
+# a single-node box hosting several public sites is the whole blast radius.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: anomaly-detection
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: anomaly-detection
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: anomaly-detection
+  policyTypes:
+    - Ingress
+    - Egress
+
+  ingress:
+    # Traefik is the only thing that should ever open a connection to this pod.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+
+        # The kubelet's httpGet liveness probe is not Traefik and is not a pod.
+        # It leaves the host and arrives over the flannel bridge, so a policy
+        # that only named Traefik would pass a dry run, apply cleanly, and then
+        # restart the container every 90 seconds with a probe failure that looks
+        # like an application fault. 10.42.0.1 is cni0; the node address is
+        # listed too so the rule survives a routing change.
+        #
+        # The readiness probe is exec and runs inside the container, so it is
+        # unaffected either way.
+        - ipBlock:
+            cidr: 10.42.0.1/32
+        - ipBlock:
+            cidr: 192.168.2.49/32
+      ports:
+        - protocol: TCP
+          port: 8090
+
+  egress:
+    # The service resolves nothing and calls nothing: the model is local and
+    # scoring is arithmetic. DNS is allowed anyway because a process that cannot
+    # resolve fails in ways that read as anything but a firewall rule, and this
+    # is the smallest allowance that avoids that.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
