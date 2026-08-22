@@ -1,0 +1,63 @@
+{
+  "mode": "diagnostic-in-sample",
+  "windows": 225,
+  "train": 157,
+  "test": 68,
+  "labelled_test": 218,
+  "positive_test": 129,
+  "positive_rate_test": 0.591743119266055,
+  "baseline": {
+    "support": 218,
+    "positives": 129,
+    "flagged": 43,
+    "true_positive": 29,
+    "false_positive": 14,
+    "false_negative": 100,
+    "true_negative": 75,
+    "precision": 0.6744186046511628,
+    "recall": 0.2248062015503876,
+    "f1": 0.3372093023255814,
+    "roc_auc": 0.5899311906628343,
+    "average_precision": 0.6542657193971233
+  },
+  "model": {
+    "support": 218,
+    "positives": 129,
+    "flagged": 12,
+    "true_positive": 8,
+    "false_positive": 4,
+    "false_negative": 121,
+    "true_negative": 85,
+    "precision": 0.6666666666666666,
+    "recall": 0.06201550387596899,
+    "f1": 0.11347517730496454,
+    "roc_auc": 0.24649420782161832,
+    "average_precision": 0.5157502241210924
+  },
+  "top_features": [
+    [
+      "cpu_percent_mean",
+      2.763
+    ],
+    [
+      "cpu_percent_std",
+      2.412
+    ],
+    [
+      "cpu_percent_max",
+      2.295
+    ],
+    [
+      "disk_percent_std",
+      2.081
+    ],
+    [
+      "disk_percent_mean",
+      2.063
+    ],
+    [
+      "swap_percent_std",
+      1.94
+    ]
+  ]
+}
