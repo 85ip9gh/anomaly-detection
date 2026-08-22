@@ -1,0 +1,31 @@
+# A plain networking.k8s.io Ingress rather than a Traefik IngressRoute, so the
+# routing itself is portable and only the rate-limit middleware is
+# provider-specific.
+#
+# There is no TLS block and that is not an omission. Cloudflare terminates TLS
+# at its edge and cloudflared carries plaintext HTTP to Traefik's `web`
+# entrypoint over the loopback-equivalent path inside the host netns; the
+# `websecure` entrypoint is deliberately not exposed. See [[g7-server]].
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: anomaly-detection
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: anomaly-detection
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    traefik.ingress.kubernetes.io/router.middlewares: apps-anomaly-detection-ratelimit@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: anomaly.pesanth.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: anomaly-detection
+                port:
+                  name: http

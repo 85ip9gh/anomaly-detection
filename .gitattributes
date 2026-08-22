@@ -1,0 +1,31 @@
+# This repository is authored on Windows with `core.autocrlf=true` and every
+# file below is parsed by a Linux process: kubectl, docker build, pip, sh.
+#
+# The vault records this exact trap costing an hour once already. A `.stignore`
+# pattern was rewritten to CRLF on checkout, so the line reaching the Linux side
+# was `/.git\r`, which matched no directory, and it was invisible from Windows
+# because Git Bash's grep tolerates a trailing CR while Linux grep does not.
+#
+# A literal block scalar in deploy/k8s/deployment.yaml carries a `python -c`
+# program, so a stray CR would land inside the string the readiness probe runs.
+# Pin the line endings rather than hope every consumer is tolerant.
+* text=auto eol=lf
+
+*.yaml text eol=lf
+*.yml text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.in text eol=lf
+*.txt text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.trivyignore text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+
+# Binary, never touched.
+*.gz binary
+*.joblib binary
