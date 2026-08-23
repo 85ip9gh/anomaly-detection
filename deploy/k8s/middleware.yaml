@@ -1,0 +1,22 @@
+# /score is an unauthenticated POST that runs an estimator, on a four-core
+# laptop that also serves four other public sites. Without a limit, one client
+# can turn a demo endpoint into a CPU sink for everything else on the box.
+#
+# The source is `Cf-Connecting-Ip`, not the connecting address. Every request
+# arrives from cloudflared on the host, so Traefik's default per-client-IP
+# criterion would see one source for the entire internet and let a single
+# visitor exhaust the budget for everyone. Cloudflare sets this header at its
+# edge and overwrites anything the client sent, and the tunnel is the only route
+# in, so it cannot be forged from outside.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: anomaly-detection-ratelimit
+  namespace: apps
+spec:
+  rateLimit:
+    average: 30
+    period: 1m
+    burst: 20
+    sourceCriterion:
+      requestHeaderName: Cf-Connecting-Ip

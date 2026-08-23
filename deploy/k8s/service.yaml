@@ -1,0 +1,19 @@
+# ClusterIP, so the only route in is Traefik, which is itself on a pinned
+# ClusterIP reachable from the host netns and from nowhere else. Nothing on the
+# LAN or the tailnet can reach this service directly.
+apiVersion: v1
+kind: Service
+metadata:
+  name: anomaly-detection
+  namespace: apps
+  labels:
+    app.kubernetes.io/name: anomaly-detection
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anomaly-detection
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

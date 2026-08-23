@@ -1,0 +1,10 @@
+# The namespace is declared here so this directory is a complete description of
+# the deployment rather than something that only works on a cluster where a
+# previous session happened to create `apps` by hand. It already exists on g7;
+# applying it again is a no-op.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: apps
+  labels:
+    app.kubernetes.io/managed-by: kubectl
