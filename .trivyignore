@@ -12,7 +12,8 @@
 # `ignore-unfixed` is deliberately NOT set on the scanner. Hiding every unfixed
 # finding would erase exactly the judgement this file records.
 #
-# Reviewed 2026-08-22 against python:3.12-slim (Debian 13, trixie).
+# Reviewed 2026-08-22 against python:3.12-slim (Debian 13, trixie), and again
+# 2026-09-07 after seven new advisories turned the gate red on `main`.
 # Re-check when the base image is next bumped: an entry that outlives its
 # reason is worse than no entry, because it reads as a decision somebody made.
 
@@ -63,3 +64,60 @@ CVE-2026-41992
 # POSIX ACL library. The service sets no ACLs and writes nothing outside the
 # container's own layer. No fixed version in Debian 13.
 CVE-2026-54369
+
+# ---------------------------------------------------------------------------
+# util-linux: bsdutils, libblkid1, liblastlog2-2, libmount1, libsmartcols1,
+# libuuid1, login, mount, util-linux. 2026-09-07.
+#
+# Four advisories published after the 2026-08-22 review, all in mount and
+# namespace handling: a failed external mount helper still running privileged
+# X-mount post-hooks (76642), `nsenter --join-cgroup` leaking root (78408),
+# X-mount.subdir detached-tree handling (78409), and restricted bind mounts not
+# pinning their target (78410).
+#
+# Installed 2.41.5-0+deb13u1, which is already what `apt-get upgrade` in the
+# Dockerfile pulls, and Debian 13 publishes no fixed version for any of the
+# four. There is nothing to take.
+#
+# Every one of them needs a privileged mount, nsenter or bind-mount call, and
+# this image can make none. Nothing in the runtime tree shells out: `tools/`
+# is copied in the builder stage only and never reaches the runtime image, and
+# `anomaly/` makes no subprocess call at all. The deployment then removes the
+# capability these need: `capabilities.drop: [ALL]`, `privileged: false`,
+# `allowPrivilegeEscalation: false`, `readOnlyRootFilesystem: true`, running as
+# uid 10001 under the RuntimeDefault seccomp profile.
+#
+# Revisit if the pod is ever granted a capability back, given a writable
+# volume, or if any runtime code starts a subprocess.
+CVE-2026-76642
+CVE-2026-78408
+CVE-2026-78409
+CVE-2026-78410
+
+# ---------------------------------------------------------------------------
+# sqlite: libsqlite3-0. 2026-09-07.
+#
+# Arbitrary code execution through crafted FTS5 input (11822) and arbitrary
+# code execution or crash by the same route (11824). Installed
+# 3.46.1-7+deb13u1, no fixed version in Debian 13.
+#
+# The library arrives with the Python base image and nothing here uses it.
+# There is no database in this service: the request path is FastAPI into
+# scikit-learn over a fitted estimator, and neither `anomaly/` nor any pinned
+# dependency imports `sqlite3`. Reaching FTS5 at all requires the application
+# to create and query a full-text table, which nothing in this repository does.
+CVE-2026-11822
+CVE-2026-11824
+
+# ---------------------------------------------------------------------------
+# systemd: libsystemd0, libudev1. 2026-09-07.
+#
+# Local privilege escalation in systemd-homed. Installed 257.13-1~deb13u1, no
+# fixed version in Debian 13.
+#
+# The scan names libsystemd0 and libudev1, the shared libraries the base image
+# carries as transitive dependencies. The vulnerable component is the
+# systemd-homed daemon, and no init system runs in this container: PID 1 is
+# uvicorn, per the Dockerfile CMD. There are also no user accounts here to
+# escalate between, since the process runs as a single unprivileged uid.
+CVE-2026-16742

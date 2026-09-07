@@ -253,11 +253,20 @@ util-linux family CVE-2026-53612 through 53615 were all fixed in
 since the advisory. An `apt-get upgrade` in the Dockerfile cleared all 20. Taking
 a fix always beats recording a reason not to.
 
-The 12 CVEs that remain have no fixed version in Debian 13 and are allowlisted in
+The 19 CVEs that remain have no fixed version in Debian 13 and are allowlisted in
 `.trivyignore` with a dated reason each. Four are CRITICAL in `perl-base`: perl
 arrives with the base image, nothing here ever executes it, and it cannot be
 purged without removing dpkg. **A perl-free base is an open item, not something
 the allowlist pretends away.**
+
+**Seven were added on 2026-09-07**, after advisories published since the first
+review turned the gate red on `main`: four in util-linux mount and namespace
+handling, two in SQLite's FTS5, one in systemd-homed. None has a fixed version,
+and `apt-get upgrade` already pulls the newest Debian publishes, so there was
+nothing to take this time. The reasons rest on what the deployment removes
+rather than on what the packages are for: `capabilities.drop: [ALL]`,
+`privileged: false`, `allowPrivilegeEscalation: false`, and no runtime code
+that starts a subprocess.
 
 [cube-store]: https://cubestore.pesanth.com
 [car-sale]: https://carsale.pesanth.com
